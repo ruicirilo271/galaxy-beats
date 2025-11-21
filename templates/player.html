@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<canvas id="particles"></canvas>
+
+<div id="playerBox">
+  <img id="cover" src="{{ cover }}">
+  <h2 id="trackTitle">{{ title }}</h2>
+  <p id="trackArtist">{{ artist }}</p>
+
+  <audio id="audio" controls autoplay></audio>
+
+  <canvas id="equalizer"></canvas>
+
+  <div id="playerControls">
+    <button onclick="prevTrack()">⏮ Anterior</button>
+    <button onclick="nextTrack()">⏭ Seguinte</button>
+  </div>
+</div>
+
+<div id="artistPanel">
+  <h2>Artista: <span id="artistName">{{ artist }}</span></h2>
+  <div id="artistMain">
+    <img id="artistImage" src="" alt="" />
+    <div id="artistBio"></div>
+  </div>
+
+  <div id="artistColumns">
+    <div>
+      <h3>Top 10 Faixas</h3>
+      <ul id="artistTopTracks"></ul>
+    </div>
+    <div>
+      <h3>Top Álbuns</h3>
+      <ul id="artistTopAlbums"></ul>
+    </div>
+    <div>
+      <h3>Artistas Semelhantes</h3>
+      <ul id="similarArtists"></ul>
+    </div>
+  </div>
+</div>
+
+<script src="/static/equalizer.js"></script>
+<script src="/static/particles.js"></script>
+<script>
+// ------- PLAYLIST + AUTOPLAY -------
+
+let playlist = [];
+let currentIndex = 0;
+
+function loadPlaylist() {
+  try {
+    playlist = JSON.parse(localStorage.getItem("playlist") || "[]");
+  } catch (e) {
+    playlist = [];
+  }
+  const urlParams = new URLSearchParams(window.location.search);
+  currentIndex = parseInt(urlParams.get("index") || localStorage.getItem("playlistIndex") || "0", 10);
+  if (isNaN(currentIndex)) currentIndex = 0;
+}
+
+function setTrack(i) {
+  if (!playlist.length || !playlist[i]) return;
+
+  currentIndex = i;
+  localStorage.setItem("playlistIndex", String(i));
+
+  const song = playlist[i];
+  const cover = song.image[2].link;
+  const url = song.downloadUrl[song.downloadUrl.length - 1].link;
+  const artist = song.primaryArtists;
+
+  document.getElementById("cover").src = cover;
+  document.getElementById("trackTitle").textContent = song.name;
+  document.getElementById("trackArtist").textContent = artist;
+  document.getElementById("artistName").textContent = artist;
+
+  const audio = document.getElementById("audio");
+  audio.src = `/stream?url=${encodeURIComponent(url)}`;
+  audio.play().catch(() => { /* autoplay pode ser bloqueado, user clica play */ });
+
+  // equalizador real
+  startEqualizer("audio", "equalizer");
+
+  // info do artista
+  loadArtistInfo(artist);
+}
+
+function nextTrack() {
+  if (!playlist.length) return;
+  let next = currentIndex + 1;
+  if (next >= playlist.length) next = 0; // loop
+  setTrack(next);
+}
+
+function prevTrack() {
+  if (!playlist.length) return;
+  let prev = currentIndex - 1;
+  if (prev < 0) prev = playlist.length - 1;
+  setTrack(prev);
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  loadPlaylist();
+  setTrack(currentIndex);
+
+  const audio = document.getElementById("audio");
+  audio.addEventListener("ended", () => {
+    nextTrack();
+  });
+});
+
+// ------- ARTIST INFO (Last.fm) -------
+
+function loadArtistInfo(name) {
+  if (!name) return;
+
+  fetch(`/artist_info?name=${encodeURIComponent(name)}`)
+    .then(r => r.json())
+    .then(data => {
+      const artistDisplayName = data.name || name;
+
+      document.getElementById("artistName").textContent = artistDisplayName;
+
+      if (data.image) {
+        document.getElementById("artistImage").src = data.image;
+        document.getElementById("artistImage").style.display = "block";
+      } else {
+        document.getElementById("artistImage").style.display = "none";
+      }
+
+      document.getElementById("artistBio").innerHTML =
+        data.bio || "Sem biografia disponível.";
+
+      // Top tracks
+      const topTracksUl = document.getElementById("artistTopTracks");
+      topTracksUl.innerHTML = "";
+      (data.top_tracks || []).forEach(t => {
+        const li = document.createElement("li");
+        li.textContent = t;
+        topTracksUl.appendChild(li);
+      });
+
+      // Top álbuns (AGORA CLICÁVEIS)
+      const topAlbumsUl = document.getElementById("artistTopAlbums");
+      topAlbumsUl.innerHTML = "";
+      (data.top_albums || []).forEach(a => {
+        const li = document.createElement("li");
+        li.textContent = a;
+        li.style.cursor = "pointer";
+        li.title = "Clique para ouvir o álbum completo";
+
+        li.onclick = () => {
+          loadAlbum(artistDisplayName, a);
+        };
+
+        topAlbumsUl.appendChild(li);
+      });
+
+      // Artistas semelhantes
+      const simUl = document.getElementById("similarArtists");
+      simUl.innerHTML = "";
+      (data.similar_artists || []).forEach(s => {
+        const li = document.createElement("li");
+        li.textContent = s;
+        simUl.appendChild(li);
+      });
+    })
+    .catch(err => {
+      console.error("Erro ao carregar info de artista:", err);
+    });
+}
+function loadAlbum(artist, album) {
+  if (!artist || !album) return;
+
+  // Vai ao backend buscar a playlist completa do álbum
+  fetch(`/album_playlist?artist=${encodeURIComponent(artist)}&album=${encodeURIComponent(album)}`)
+    .then(r => r.json())
+    .then(json => {
+      if (!json.results || json.results.length === 0) {
+        alert("Não foi possível montar o álbum completo.");
+        return;
+      }
+
+      // Guardar a nova playlist (álbum completo)
+      playlist = json.results;
+      localStorage.setItem("playlist", JSON.stringify(playlist));
+      localStorage.setItem("playlistIndex", "0");
+
+      // Começar a tocar na faixa 0
+      setTrack(0);
+    })
+    .catch(err => {
+      console.error("Erro ao carregar álbum:", err);
+      alert("Erro ao carregar álbum.");
+    });
+}
+
+</script>
+
+</body>
+</html>
+

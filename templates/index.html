@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <title>Galaxy Beats — Neon JioSaavn Player</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<canvas id="particles"></canvas>
+
+<div id="searchBox">
+  <input id="query" placeholder="Pesquisar artista ou música...">
+  <button onclick="searchSongs()">🔍</button>
+</div>
+
+<div id="results"></div>
+<div id="playlistPanel">
+    <h2>🎵 Minhas Playlists</h2>
+
+    <button class="createBtn" onclick="createPlaylist()">➕ Criar nova playlist</button>
+
+    <ul id="playlistList"></ul>
+</div>
+
+<!-- Editor de playlist -->
+<div id="playlistEditor" style="display:none;">
+    <div id="playlistEditorContent">
+        <h2 id="playlistEditorTitle"></h2>
+
+        <img id="playlistEditorCover" src="" alt="cover">
+
+        <div id="playlistEditorButtons">
+            <button onclick="renamePlaylist()">✏️ Renomear</button>
+            <button onclick="deletePlaylist()">🗑️ Apagar</button>
+            <button onclick="closePlaylistEditor()">✖ Fechar</button>
+        </div>
+
+        <h3>Músicas</h3>
+        <ul id="playlistSongs"></ul>
+    </div>
+</div>
+
+<div id="playlistPanel">
+    <h2>🎵 Playlists</h2>
+    <ul id="playlistList"></ul>
+</div>
+
+<script src="/static/script.js"></script>
+<script src="/static/particles.js"></script>
+
+</body>
+</html>
+

@@ -119,6 +119,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // ------- ARTIST INFO (Last.fm) -------
 
+// ------- ARTIST INFO (Last.fm) -------
 function loadArtistInfo(name) {
   if (!name) return;
 
@@ -139,16 +140,48 @@ function loadArtistInfo(name) {
       document.getElementById("artistBio").innerHTML =
         data.bio || "Sem biografia disponível.";
 
-      // Top tracks
+      // -------------------------------
+      // 🔵 TOP TRACKS — AGORA CLICÁVEIS
+      // -------------------------------
       const topTracksUl = document.getElementById("artistTopTracks");
       topTracksUl.innerHTML = "";
       (data.top_tracks || []).forEach(t => {
         const li = document.createElement("li");
         li.textContent = t;
+        li.style.cursor = "pointer";
+        li.style.color = "#00eaff";
+        li.title = "Ouvir esta faixa";
+
+        li.onclick = () => {
+          // Pesquisa direta desta faixa — abre automaticamente o player
+          searchSongsByClick(`${artistDisplayName} ${t}`);
+        };
+
         topTracksUl.appendChild(li);
       });
 
-      // Top álbuns (AGORA CLICÁVEIS)
+      // -------------------------------
+      // 🔵 ARTISTAS SEMELHANTES — CLICÁVEIS
+      // -------------------------------
+      const simUl = document.getElementById("similarArtists");
+      simUl.innerHTML = "";
+      (data.similar_artists || []).forEach(s => {
+        const li = document.createElement("li");
+        li.textContent = s;
+        li.style.cursor = "pointer";
+        li.style.color = "#00eaff";
+        li.title = "Ver artista";
+
+        li.onclick = () => {
+          loadArtistInfo(s); // carrega o artista automaticamente
+        };
+
+        simUl.appendChild(li);
+      });
+
+      // -------------------------------
+      // TOP ÁLBUNS (já estavam clicáveis)
+      // -------------------------------
       const topAlbumsUl = document.getElementById("artistTopAlbums");
       topAlbumsUl.innerHTML = "";
       (data.top_albums || []).forEach(a => {
@@ -157,26 +190,17 @@ function loadArtistInfo(name) {
         li.style.cursor = "pointer";
         li.title = "Clique para ouvir o álbum completo";
 
-        li.onclick = () => {
-          loadAlbum(artistDisplayName, a);
-        };
+        li.onclick = () => loadAlbum(artistDisplayName, a);
 
         topAlbumsUl.appendChild(li);
       });
 
-      // Artistas semelhantes
-      const simUl = document.getElementById("similarArtists");
-      simUl.innerHTML = "";
-      (data.similar_artists || []).forEach(s => {
-        const li = document.createElement("li");
-        li.textContent = s;
-        simUl.appendChild(li);
-      });
     })
     .catch(err => {
       console.error("Erro ao carregar info de artista:", err);
     });
 }
+
 function loadAlbum(artist, album) {
   if (!artist || !album) return;
 
@@ -200,6 +224,28 @@ function loadAlbum(artist, album) {
     .catch(err => {
       console.error("Erro ao carregar álbum:", err);
       alert("Erro ao carregar álbum.");
+    });
+}
+function searchSongsByClick(q) {
+  fetch(`/search?q=${encodeURIComponent(q)}`)
+    .then(r => r.json())
+    .then(json => {
+      const res = json.data?.results;
+      if (!res || !res.length) {
+        alert("Nenhum resultado encontrado.");
+        return;
+      }
+
+      // Guardar playlist com 1 música
+      localStorage.setItem("playlist", JSON.stringify(res));
+      localStorage.setItem("playlistIndex", "0");
+
+      const s = res[0];
+      const cover = s.image[2].link;
+      const url = s.downloadUrl[s.downloadUrl.length - 1].link;
+
+      window.location.href =
+        `/player?title=${encodeURIComponent(s.name)}&cover=${encodeURIComponent(cover)}&url=${encodeURIComponent(url)}&artist=${encodeURIComponent(s.primaryArtists)}&index=0`;
     });
 }
 
